@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ultimate To-Do App</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #f0f4f8;
+      --text-color: #333;
+      --primary-color: #667eea;
+      --secondary-color: #764ba2;
+      --task-bg: #fff;
+      --task-border: #eee;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: url("scheduling1.webp");
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 2rem;
+      transition: background 0.5s, color 0.5s;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2.5rem;
+      font-weight: 600;
+      background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: fadeInDown 1s ease-out;
+    }
+
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+      animation: fadeIn 1.2s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .task-input, .filters, .reminder-settings {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      animation: slideUp 0.8s ease;
+    }
+
+    .task-input input[type="text"], .filters input[type="text"], .reminder-settings input[type="time"] {
+      flex: 1;
+      padding: 0.75rem;
+      border: 2px solid var(--primary-color);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    .task-input button, .filters button, .export-button, .reminder-settings button {
+      background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+      color: white;
+      padding: 0.75rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .task-input button:hover, .filters button:hover, .export-button:hover, .reminder-settings button:hover {
+      transform: scale(1.05);
+    }
+
+    ul.task-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    ul.task-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+      background-color: var(--task-bg);
+      border: 1px solid var(--task-border);
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      animation: slideUp 0.5s ease;
+    }
+
+    .task-list li.completed {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
+    .task-actions button {
+      background: transparent;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      margin-left: 0.5rem;
+    }
+
+    .welcome-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .calendar, .reminder-settings, .filters {
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="welcome-screen" onclick="startApp()">
+    Tap anywhere to start ➡️
+  </div>
+
+  <header>📝To-Do-List App</header>
+
+  <div class="container" id="mainApp" style="display:none">
+    <div class="task-input">
+      <input type="text" id="taskInput" placeholder="Add a new task...">
+      <button onclick="addTask()">Add</button>
+    </div>
+
+    <div class="filters">
+      <input type="text" id="searchInput" placeholder="Search tasks..." oninput="renderTasks()">
+      <button class="export-button" onclick="exportTasks()">Export 📤</button>
+    </div>
+
+    <ul class="task-list" id="taskList"></ul>
+
+    <div class="calendar">
+      <input type="date" id="calendarPicker" onchange="filterByDate()">
+    </div>
+
+    <div class="reminder-settings">
+      <input type="time" id="reminderTime">
+      <button onclick="setReminder()">Set Daily Reminder ⏰</button>
+    </div>
+  </div>
+
+  <audio id="notifySound" src="https://www.soundjay.com/buttons/sounds/button-09.mp3"></audio>
+
+  <script>
+    const taskList = document.getElementById('taskList');
+    const taskInput = document.getElementById('taskInput');
+    const searchInput = document.getElementById('searchInput');
+    const notifySound = document.getElementById('notifySound');
+    let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+
+    function startApp() {
+      document.querySelector('.welcome-screen').style.display = 'none';
+      document.getElementById('mainApp').style.display = 'block';
+    }
+
+    function saveTasks() {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+    }
+
+    function renderTasks() {
+      const filter = searchInput.value.toLowerCase();
+      taskList.innerHTML = '';
+      tasks.forEach((task, index) => {
+        if (!task.text.toLowerCase().includes(filter)) return;
+        const li = document.createElement('li');
+        li.className = task.completed ? 'completed' : '';
+
+        const span = document.createElement('span');
+        span.textContent = task.text;
+        span.contentEditable = true;
+        span.onblur = () => {
+          tasks[index].text = span.textContent;
+          saveTasks();
+        };
+
+        const actions = document.createElement('div');
+        actions.classList.add('task-actions');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = task.completed;
+        checkbox.onclick = () => {
+          tasks[index].completed = !tasks[index].completed;
+          saveTasks();
+          renderTasks();
+        };
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.onclick = () => {
+          tasks.splice(index, 1);
+          saveTasks();
+          renderTasks();
+        };
+
+        actions.appendChild(checkbox);
+        actions.appendChild(delBtn);
+        li.appendChild(span);
+        li.appendChild(actions);
+        taskList.appendChild(li);
+      });
+    }
+
+    function addTask() {
+      const text = taskInput.value.trim();
+      if (!text) return;
+      tasks.push({ text, completed: false });
+      taskInput.value = '';
+      saveTasks();
+      renderTasks();
+      notifySound.play();
+    }
+
+    function exportTasks() {
+      const blob = new Blob([JSON.stringify(tasks)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'todo-tasks.json';
+      a.click();
+    }
+
+    function setReminder() {
+      const time = document.getElementById('reminderTime').value;
+      localStorage.setItem('reminderTime', time);
+      alert('Reminder set for ' + time);
+    }
+
+    function dailyReminderCheck() {
+      const time = localStorage.getItem('reminderTime');
+      if (!time) return;
+      const now = new Date();
+      const [h, m] = time.split(":");
+      if (now.getHours() === parseInt(h) && now.getMinutes() === parseInt(m)) {
+        alert("⏰ It's time to check your to-do list!");
+        notifySound.play();
+      }
+    }
+
+    function filterByDate() {
+      alert("Date filtering is a placeholder. Link tasks to dates to enable this.");
+    }
+
+    setInterval(dailyReminderCheck, 60000); // check every minute
+    window.onload = renderTasks;
+  </script>
+</body>
+</html>
